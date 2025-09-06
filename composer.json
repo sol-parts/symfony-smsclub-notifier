@@ -1,0 +1,37 @@
+{
+  "name": "sol-parts/symfony-smsclub-notifier",
+  "type": "symfony-notifier-bridge",
+  "description": "Symfony SmsClub Notifier Bridge",
+  "keywords": ["sms", "smsclub", "notifier"],
+  "homepage": "https://sol.parts",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Andrii Didenko",
+      "email": "andrii@didenko.dev"
+    },
+    {
+      "name": "Oleksandr Nechyporuk",
+      "email": "oleksandr@nechyporuk.name"
+    },
+    {
+      "name": "Symfony Community",
+      "homepage": "https://symfony.com/contributors"
+    }
+  ],
+  "require": {
+    "php": ">=8.2",
+    "ext-mbstring": "*",
+    "symfony/http-client": "^6.4|^7.0",
+    "symfony/notifier": "^7.3"
+  },
+  "autoload": {
+    "psr-4": {
+      "SolParts\\SymfonySmsClubNotifier\\": ""
+    },
+    "exclude-from-classmap": [
+      "/Tests/"
+    ]
+  },
+  "minimum-stability": "dev"
+}

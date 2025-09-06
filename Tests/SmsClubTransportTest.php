@@ -76,6 +76,28 @@ final class SmsClubTransportTest extends TransportTestCase
         self::assertSame('1241725993', $sentMessage->getMessageId());
     }
 
+    public function testFailedSendWithPartialAccepted()
+    {
+        $response = new JsonMockResponse(body: [
+            'success_request' => [
+                'add_info' => [
+                    '38093123456789' => 'Incorrect phone number'
+                ]
+            ],
+        ], info: ['http_code' => 200]);
+
+        $client = new MockHttpClient(static fn () => $response);
+
+        $message = new SmsMessage('38093123456789', 'Test');
+
+        $transport = self::createTransport($client);
+
+        $this->expectException(TransportException::class);
+        $this->expectExceptionMessage('Unable to send the SMS with SmsClub: "{"38093123456789":"Incorrect phone number"}".');
+
+        $transport->send($message);
+    }
+
     public function testFailedSend()
     {
         $response = new JsonMockResponse(body: [

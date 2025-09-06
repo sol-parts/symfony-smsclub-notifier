@@ -94,14 +94,12 @@ final class SmsClubTransport extends AbstractTransport
             throw new TransportException('Could not decode body to an array.', $response, 0, $e);
         }
 
-        if (200 !== $statusCode) {
+        if (isset($content['success_request']['add_info']) || 200 !== $statusCode) {
             $message = $content['message'] ?? \json_encode($content['success_request']['add_info'] ?? ['unknown error'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             throw new TransportException(\sprintf('Unable to send the SMS with SmsClub: "%s".', $message), $response);
         }
 
-        $messageId = array_key_first($content['success_request']['info'] ?? []);
-
-
+        $messageId = \array_key_first($content['success_request']['info'] ?? []);
 
         $sentMessage = new SentMessage($message, (string) $this);
         $sentMessage->setMessageId((string) $messageId);

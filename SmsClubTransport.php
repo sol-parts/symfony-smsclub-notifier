@@ -1,6 +1,4 @@
 <?php
-
-declare(strict_types=1);
 /*
  * This file is part of the Sol.parts package.
  *
@@ -15,14 +13,14 @@ namespace SolParts\SymfonySmsClubNotifier;
 use Symfony\Component\Notifier\Exception\LengthException;
 use Symfony\Component\Notifier\Exception\TransportException;
 use Symfony\Component\Notifier\Exception\UnsupportedMessageTypeException;
+use Symfony\Component\Notifier\Transport\AbstractTransport;
 use Symfony\Component\Notifier\Message\MessageInterface;
 use Symfony\Component\Notifier\Message\SentMessage;
 use Symfony\Component\Notifier\Message\SmsMessage;
-use Symfony\Component\Notifier\Transport\AbstractTransport;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * @author Andrii Didenko <andrii@didenko.dev>
@@ -37,8 +35,7 @@ final class SmsClubTransport extends AbstractTransport
     private const SENDER_LIMIT = 20;
 
     public function __construct(
-        #[\SensitiveParameter]
-        private string $authToken,
+        #[\SensitiveParameter] private string $authToken,
         private string $from,
         ?HttpClientInterface $client = null,
         ?EventDispatcherInterface $dispatcher = null,
@@ -50,7 +47,7 @@ final class SmsClubTransport extends AbstractTransport
 
     public function __toString(): string
     {
-        return \sprintf('smsclub://%s?from=%s', $this->getEndpoint(), \urlencode($this->from));
+        return \sprintf('smsclub://%s?from=%s', $this->getEndpoint(), urlencode($this->from));
     }
 
     public function supports(MessageInterface $message): bool
@@ -98,7 +95,7 @@ final class SmsClubTransport extends AbstractTransport
         }
 
         if (isset($content['success_request']['add_info']) || 200 !== $statusCode) {
-            $message = $content['message'] ?? \json_encode($content['success_request']['add_info'] ?? ['unknown error'], \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
+            $message = $content['message'] ?? \json_encode($content['success_request']['add_info'] ?? ['unknown error'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             throw new TransportException(\sprintf('Unable to send the SMS with SmsClub: "%s".', $message), $response);
         }
 
@@ -120,7 +117,7 @@ final class SmsClubTransport extends AbstractTransport
     private function assertValidSubject(string $subject): void
     {
         // Detect if there is at least one cyrillic symbol in the text
-        if (\preg_match('/\p{Cyrillic}/u', $subject)) {
+        if (preg_match('/\p{Cyrillic}/u', $subject)) {
             $subjectLimit = self::SUBJECT_CYRILLIC_LIMIT;
             $symbols = 'cyrillic';
         } else {
@@ -128,7 +125,7 @@ final class SmsClubTransport extends AbstractTransport
             $symbols = 'latin';
         }
 
-        if (\mb_strlen($subject, 'UTF-8') > $subjectLimit) {
+        if (mb_strlen($subject, 'UTF-8') > $subjectLimit) {
             throw new LengthException(\sprintf('The subject length for "%s" symbols of a SmsClub message must not exceed %d characters.', $symbols, $subjectLimit));
         }
     }

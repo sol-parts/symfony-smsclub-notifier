@@ -2,7 +2,7 @@
   "name": "sol-parts/symfony-smsclub-notifier",
   "type": "symfony-notifier-bridge",
   "description": "Symfony SmsClub Notifier Bridge",
-  "keywords": ["sms", "smsclub", "notifier"],
+  "keywords": ["sms", "smsclub", "notifier", "symfony"],
   "homepage": "https://sol.parts",
   "license": "MIT",
   "authors": [

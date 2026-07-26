@@ -1,6 +1,5 @@
 <?php
 
-declare(strict_types=1);
 /*
  * This file is part of the Sol.parts package.
  *
@@ -10,9 +9,10 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
+declare(strict_types=1);
+
 namespace SolParts\SymfonySmsClubNotifier;
 
-use Symfony\Component\Notifier\Exception\LengthException;
 use Symfony\Component\Notifier\Exception\TransportException;
 use Symfony\Component\Notifier\Exception\UnsupportedMessageTypeException;
 use Symfony\Component\Notifier\Message\MessageInterface;
@@ -32,19 +32,13 @@ final class SmsClubTransport extends AbstractTransport
 {
     protected const HOST = 'im.smsclub.mobi';
 
-    private const SUBJECT_LATIN_LIMIT = 1521;
-    private const SUBJECT_CYRILLIC_LIMIT = 661;
-    private const SENDER_LIMIT = 20;
-
     public function __construct(
         #[\SensitiveParameter]
-        private string $authToken,
-        private string $from,
+        private readonly string $authToken,
+        private readonly string $from,
         ?HttpClientInterface $client = null,
         ?EventDispatcherInterface $dispatcher = null,
     ) {
-        $this->assertValidFrom($from);
-
         parent::__construct($client, $dispatcher);
     }
 
@@ -61,22 +55,13 @@ final class SmsClubTransport extends AbstractTransport
     protected function doSend(MessageInterface $message): SentMessage
     {
         if (!$message instanceof SmsMessage) {
-            throw new UnsupportedMessageTypeException(__CLASS__, SmsMessage::class, $message);
+            throw new UnsupportedMessageTypeException(self::class, SmsMessage::class, $message);
         }
 
-        $this->assertValidSubject($message->getSubject());
-
-        $fromMessage = $message->getFrom();
-
-        if ($fromMessage) {
-            $this->assertValidFrom($fromMessage);
-            $from = $fromMessage;
-        } else {
-            $from = $this->from;
-        }
+        $from = $message->getFrom() ?: $this->from;
 
         $endpoint = \sprintf('https://%s/sms/send', $this->getEndpoint());
-        $response = $this->client->request('POST', $endpoint, [
+        $response = $this->httpClient()->request('POST', $endpoint, [
             'auth_bearer' => $this->authToken,
             'json' => [
                 'src_addr' => $from,
@@ -98,38 +83,42 @@ final class SmsClubTransport extends AbstractTransport
         }
 
         if (isset($content['success_request']['add_info']) || 200 !== $statusCode) {
-            $message = $content['message'] ?? \json_encode($content['success_request']['add_info'] ?? ['unknown error'], \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
-            throw new TransportException(\sprintf('Unable to send the SMS with SmsClub: "%s".', $message), $response);
+            $textError = $content['message'] ?? \json_encode($content['success_request']['add_info'] ?? ['unknown error'], \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
+            throw new TransportException(\sprintf('Unable to send the SMS with SmsClub: "%s".', $textError), $response);
         }
 
         $messageId = \array_key_first($content['success_request']['info'] ?? []);
 
-        $sentMessage = new SentMessage($message, (string) $this);
+        $sentMessage = new SentMessage($message, (string) $this, $content);
         $sentMessage->setMessageId((string) $messageId);
 
         return $sentMessage;
     }
 
-    private function assertValidFrom(string $from): void
+    public function balance(): string
     {
-        if (\mb_strlen($from, 'UTF-8') > self::SENDER_LIMIT) {
-            throw new LengthException(\sprintf('The sender length of a SmsClub message must not exceed %d characters.', self::SENDER_LIMIT));
+        $endpoint = \sprintf('https://%s/sms/balance', $this->getEndpoint());
+
+        $response = $this->httpClient()->request('POST', $endpoint, [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $this->authToken,
+            ],
+        ]);
+
+        try {
+            $info = $response->toArray(false);
+        } catch (\Exception|\Error $e) {
+            throw new TransportException('SmsClub API request execution error.', $response, 0, $e);
         }
+
+        $amount = $info['success_request']['info']['money'] ?? 'n/a';
+        $currency = $info['success_request']['info']['currency'] ?? '';
+
+        return \trim(\sprintf('%s %s', $amount, $currency));
     }
 
-    private function assertValidSubject(string $subject): void
+    private function httpClient(): HttpClientInterface
     {
-        // Detect if there is at least one cyrillic symbol in the text
-        if (\preg_match('/\p{Cyrillic}/u', $subject)) {
-            $subjectLimit = self::SUBJECT_CYRILLIC_LIMIT;
-            $symbols = 'cyrillic';
-        } else {
-            $subjectLimit = self::SUBJECT_LATIN_LIMIT;
-            $symbols = 'latin';
-        }
-
-        if (\mb_strlen($subject, 'UTF-8') > $subjectLimit) {
-            throw new LengthException(\sprintf('The subject length for "%s" symbols of a SmsClub message must not exceed %d characters.', $symbols, $subjectLimit));
-        }
+        return $this->client ?? throw new \LogicException('SMS Club HTTP client is not initialized.');
     }
 }

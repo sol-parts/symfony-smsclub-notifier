@@ -1,6 +1,5 @@
 <?php
 
-declare(strict_types=1);
 /*
  * This file is part of the Sol.parts package.
  *
@@ -10,12 +9,13 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
+declare(strict_types=1);
+
 namespace SolParts\SymfonySmsClubNotifier\Tests;
 
 use SolParts\SymfonySmsClubNotifier\SmsClubTransport;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\JsonMockResponse;
-use Symfony\Component\Notifier\Exception\LengthException;
 use Symfony\Component\Notifier\Exception\TransportException;
 use Symfony\Component\Notifier\Message\ChatMessage;
 use Symfony\Component\Notifier\Message\SentMessage;
@@ -48,18 +48,19 @@ final class SmsClubTransportTest extends TransportTestCase
         yield [new DummyMessage()];
     }
 
-    public function testSuccessfulSend()
+    public function testSuccessfulSend(): void
     {
-        $response = new JsonMockResponse(body: [
+        $body = [
             'success_request' => [
                 'info' => [
                     '1241725993' => '380931234567',
                 ],
             ],
-        ], info: ['http_code' => 200]);
+        ];
+        $response = new JsonMockResponse(body: $body, info: ['http_code' => 200]);
 
         $client = new MockHttpClient(static function (string $method, string $url, array $options) use ($response): ResponseInterface {
-            $body = \json_decode($options['body'], true);
+            $body = \json_decode((string) $options['body'], true);
             self::assertSame([
                 'src_addr' => 'sender',
                 'phone' => ['380931234567'],
@@ -76,9 +77,10 @@ final class SmsClubTransportTest extends TransportTestCase
 
         self::assertInstanceOf(SentMessage::class, $sentMessage);
         self::assertSame('1241725993', $sentMessage->getMessageId());
+        self::assertSame($body, $sentMessage->getInfo());
     }
 
-    public function testFailedSendWithPartialAccepted()
+    public function testFailedSendWithPartialAccepted(): void
     {
         $response = new JsonMockResponse(body: [
             'success_request' => [
@@ -100,7 +102,7 @@ final class SmsClubTransportTest extends TransportTestCase
         $transport->send($message);
     }
 
-    public function testFailedSend()
+    public function testFailedSend(): void
     {
         $response = new JsonMockResponse(body: [
             'success_request' => [
@@ -120,45 +122,5 @@ final class SmsClubTransportTest extends TransportTestCase
         $this->expectExceptionMessage('Unable to send the SMS with SmsClub: "{"src_addr":"Некоректне Альфа Ім\'я"}');
 
         $transport->send($message);
-    }
-
-    public function testInvalidFrom()
-    {
-        $this->expectException(LengthException::class);
-        $this->expectExceptionMessage('The sender length of a SmsClub message must not exceed 20 characters.');
-
-        new SmsClubTransport('authToken', 'abcdefghijklmnopqrstu', $this->createMock(HttpClientInterface::class));
-    }
-
-    public function testInvalidSubjectWithLatinSymbols()
-    {
-        $message = new SmsMessage('380931234567', \str_repeat('z', 1522));
-        $transport = new SmsClubTransport('authToken', 'sender', $this->createMock(HttpClientInterface::class));
-
-        $this->expectException(LengthException::class);
-        $this->expectExceptionMessage('The subject length for "latin" symbols of a SmsClub message must not exceed 1521 characters.');
-
-        $transport->send($message);
-    }
-
-    public function testInvalidSubjectWithCyrillicSymbols()
-    {
-        $message = new SmsMessage('380931234567', \str_repeat('z', 661) . 'Й');
-        $transport = new SmsClubTransport('authToken', 'sender', $this->createMock(HttpClientInterface::class));
-
-        $this->expectException(LengthException::class);
-        $this->expectExceptionMessage('The subject length for "cyrillic" symbols of a SmsClub message must not exceed 661 characters.');
-
-        $transport->send($message);
-    }
-
-    public function testSmsMessageWithInvalidFrom()
-    {
-        $transport = $this->createTransport();
-
-        $this->expectException(LengthException::class);
-        $this->expectExceptionMessage('The sender length of a SmsClub message must not exceed 20 characters.');
-
-        $transport->send(new SmsMessage('380931234567', 'test', 'abcdefghijklmnopqrstu'));
     }
 }
